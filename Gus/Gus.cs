@@ -7,12 +7,20 @@ namespace Gus
 {
     public class Gus
     {
-		GusLProcessor _processor = null;
-		List<string> _memory = null;
+		GusLProcessor _processor;
+		readonly List<string> _memory;
 
-        // TODO
-		// Some pairs we remove - either meaningless or nasty
-        public static List<string> BadCombos = new List<string>
+		// Some pairs we ignore
+		// They are either:- either meaningless or nasty or redundant
+
+        /// <summary>
+        /// Some combinations we ignore.
+		/// The are either:
+		/// Pointless (e.g. "po"),
+		/// Redundant (e.g. "cp" - better expressed as "2t"),
+		/// Nasty (e.g "FF")
+        /// </summary>
+        static List<string> BadCombos = new List<string>
         {
             "po", "to" ,"eo", "ro","do","mo","cp","ct","cr","cd",
             "cm","cp","cw","wp","wt","ww","no","nn","Po","PP",
@@ -34,7 +42,7 @@ namespace Gus
 
 		public void GuessSequence(List<int> sequence)
         {
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
 
             foreach (var hypothesis in Hypothesise())
@@ -44,7 +52,7 @@ namespace Gus
                 {
 					sw.Stop();
 
-					GusEventArgs gusEventArgs = new GusEventArgs()
+					var gusEventArgs = new GusEventArgs
                     {
                         Elapsed = sw.Elapsed,
                         Prediction = prediction,
@@ -56,20 +64,16 @@ namespace Gus
 
 						guess(this, gusEventArgs);
 					}
-                    // Stop if correct
-					if(gusEventArgs.IsCorrect)
+					// Stop if correct
+					if (gusEventArgs.IsCorrect)
 					{
 						// Remember this rule
-                        Remember(hypothesis);
-                        break;
+						Remember(hypothesis);
+						break;
 					}
-                    // Otherwise carry on
-					else
-					{
-						sw.Reset();
-                        sw.Restart();
-					}  
-                }
+					sw.Reset();
+					sw.Restart();
+				}
             }
         }
   
@@ -100,8 +104,7 @@ namespace Gus
 					}
 					break;
 				}
-				// If we errored then bail.
-				else if (predictResult == GusStatus.Error)
+				if (predictResult == GusStatus.Error)
 				{
 					if (verbose)
 					{
@@ -110,8 +113,7 @@ namespace Gus
 					predictedCorrectly = false;
 					break;
 				}
-				// If we made a guess, but it's wrong, then bail
-				else if (predictResult == GusStatus.OK && prediction != sequence[i])
+				if (predictResult == GusStatus.OK && prediction != sequence[i])
 				{
 					if (verbose)
 					{
@@ -122,7 +124,7 @@ namespace Gus
 
 				}
 				// If we made a guess and its correct then flag this.
-				else if (predictResult == GusStatus.OK && prediction == sequence[i])
+				if (predictResult == GusStatus.OK && prediction == sequence[i])
 				{
 					if (verbose)
 					{
@@ -139,46 +141,45 @@ namespace Gus
             {
                 // Make a final prediction            
 				var predictResult = TryMakePrediction(sequence, hypothesis, verbose, out finalPrediction);
-			    if (predictResult == GusStatus.Underflow)
-                {
-                    if (verbose)
-                    {
-                        Console.WriteLine("Hypothesis caused underflow");
-                    }
-                    success = false;
-                }
-				else if (predictResult == GusStatus.Error)
-                {
-                    if (verbose)
-                    {
-                        Console.WriteLine("Hypothesis failed with error: {0}", _processor.LastError);
-                    }
-					success = false;
-                }
-                // If we made a guess, lets hope its right
-                else if (predictResult == GusStatus.OK)
-                {
-                    if (verbose)
-                    {
-                        Console.WriteLine("Hypothesis predicting: {0}", finalPrediction);
-                    }
-					success = true;
-                }
-            }
+				switch (predictResult)
+				{
+					case GusStatus.Underflow:
+						if (verbose)
+						{
+							Console.WriteLine("Hypothesis caused underflow");
+						}
+						success = false;
+						break;
+					case GusStatus.Error:
+						if (verbose)
+						{
+							Console.WriteLine("Hypothesis failed with error: {0}", _processor.LastError);
+						}
+						success = false;
+						break;
+					case GusStatus.OK:
+						if (verbose)
+						{
+							Console.WriteLine("Hypothesis predicting: {0}", finalPrediction);
+						}
+						success = true;
+						break;
+				}
+			}
 
 			return success;
-        }   
+		}
 
 		/// <summary>
-        /// Create a stack from the supplied list and run the supplied GusL string against it.
+		/// Create a stack from the supplied list and run the supplied GusL string against it.
 		/// If sucessful a prediction for the next element will be returned
-        /// </summary>
+		/// </summary>
 		public GusStatus TryMakePrediction(List<int> sequence, string gusl, bool verbose, out int prediction)
         {
 			prediction = 0;
 
 			// Build a stack for this sequence
-            Stack<int> stack = new Stack<int>();
+            var stack = new Stack<int>();
             for (int i = 0; i < sequence.Count; i++)
             {
                 stack.Push(sequence[i]);
@@ -199,7 +200,8 @@ namespace Gus
             {
                 foreach (var hypothesis in Combine(n))
                 {
-                    string h = string.Concat(hypothesis);
+                    var h = string.Concat(hypothesis);
+					if(!ContainsBadPairs(h))
                     {
                         yield return h;
                     }
@@ -224,18 +226,21 @@ namespace Gus
             }
         }
 
-	    string RemoveBadPairs(string v)
+	    bool ContainsBadPairs(string hypothesis)
         {
-            if (v.Length < 2)
+			if (hypothesis.Length < 2)
             {
-                return v;
+                return false;
             }
 
             foreach (string pair in BadCombos)
             {
-                v = v.Replace(pair, string.Empty);
+				if (hypothesis.Contains(pair))
+				{
+					return true;
+				}
             }
-            return v;
+            return false;
         }
 
         void Remember(string hypothesis)
@@ -246,7 +251,7 @@ namespace Gus
 				{
                     for (int j = 0; j <= hypothesis.Length - i; j++)
 					{
-						string factoid = hypothesis.Substring(j, i);
+						var factoid = hypothesis.Substring(j, i);
                         if(!_memory.Contains(factoid))
 						{
 							_memory.Add(factoid);
@@ -255,5 +260,5 @@ namespace Gus
 				}
 			}
 		}
-    }
+	}
 }

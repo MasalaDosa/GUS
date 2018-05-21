@@ -11,23 +11,23 @@ namespace Gus
 	/// A processor for the GusL language as described in the
 	/// March 1987 edition of Acorn User Magasine.
 	/// The following operators are supported:
-	/// p - Plus    - a b -> (a + b)
-	/// m - Minus   - a b -> (a - b)
-	/// t - Times   - a b -> (a * b)
-	/// d - Divide  - a b -> (a / b)
-	/// r - Remain  - a n -> (a % b)
-	/// e - Exp     - a b -> (a ^ b)
-	/// w - Swap    - a b -> b a
-	/// c - Copy    - a -> a a
-	/// o - Pop     - a b -> a
-	/// 1 - 1       - a -> a 1
+	/// p - Plus            - a b becomes (a + b)
+	/// m - Minus           - a b becomes (a - b)
+	/// t - Times           - a b becomes (a * b)
+	/// d - Divide          - a b becomes (a / b)
+	/// r - Remain          - a n becomes (a % b)
+	/// e - Exp             - a b becomes (a ^ b)
+	/// w - Swap            - a b becomes b a
+	/// c - Copy            - a becomes a a
+	/// o - Pop             - a b becomes a
+	/// 1 - 1               - a becomes a 1
 	/// ...
-	/// : - 10      - a -> a 10
-	/// ; < = > ?   - a -> <see langword="async"/> {11:15}
-	/// @ - 16      - a -> a 16
-	/// P - Prime   - n -> nthPrime
-	/// F - Fact    - n -> Factorial(n)
-	/// n - Number  - a -> a nth
+	/// : - 10              - a becomes a 10
+	/// ; &lt; = &gt;  ?    - a becomes {11:15}
+	/// @ - 16              - a becomes a 16
+	/// P - Prime           - n becomes nthPrime
+	/// F - Fact            - n becomes Factorial(n)
+	/// n - Number          - a becomes a nth
     /// </summary>
     public class GusLProcessor
     {
@@ -110,24 +110,21 @@ namespace Gus
 			{
 				Console.WriteLine("Evaluating: {0}", op);
 			}
-            
-            if (op >= '1' && op <= '@')
+
+			if (op >= '1' && op <= '@')
 			{
-			    _stack.Push(op - '1' + 1);
+				_stack.Push(op - '1' + 1);
 				return GusStatus.OK;
 			}
-			else
-			{
-				return (GusStatus)GetMethodInfo(op).Invoke(this, null);
-			}
-        }
+			return (GusStatus)GetMethodInfo(op).Invoke(this, null);
+		}
 
 		///  <summary>
 		/// Pops N elements into a list
         /// </summary>
 		List<int> PopN(int n)	
 		{
-			List<int> r = new List<int>();
+			var r = new List<int>();
 			while (n > 0)
             {
 				r.Add(_stack.Pop());
@@ -147,7 +144,16 @@ namespace Gus
                 return GusStatus.Underflow;
             }
             var ops = PopN(2);
-            _stack.Push(ops[1] + ops[0]);
+			try
+			{
+				_stack.Push(checked(ops[1] + ops[0]));
+			}
+            catch(OverflowException)
+			{
+				LastError = "Operation caused overflow";
+				return GusStatus.Error;
+			}
+            
 			return GusStatus.OK;
         }
         
@@ -162,7 +168,15 @@ namespace Gus
                 return GusStatus.Underflow;
             }
             var ops = PopN(2);
-            _stack.Push(ops[1] - ops[0]);
+			try
+			{
+				_stack.Push(checked(ops[1] - ops[0]));
+			}
+			catch (OverflowException)
+            {
+                LastError = "Operation caused overflow";
+                return GusStatus.Error;
+            }
 			return GusStatus.OK;
         }
 
@@ -177,7 +191,15 @@ namespace Gus
                 return GusStatus.Underflow;
             }
             var ops = PopN(2);
-            _stack.Push(ops[1] * ops[0]);
+			try
+			{
+				_stack.Push(checked(ops[1] * ops[0]));
+			}
+			catch (OverflowException)
+            {
+                LastError = "Operation caused overflow";
+                return GusStatus.Error;
+            }
 			return GusStatus.OK;
         }
 
@@ -197,7 +219,15 @@ namespace Gus
                 LastError = "Division by zero (divide)";
                 return GusStatus.Error;
             }
-            _stack.Push(ops[1] / ops[0]);
+			try
+			{
+				_stack.Push(checked(ops[1] / ops[0]));
+			}
+			catch (OverflowException)
+            {
+                LastError = "Operation caused overflow";
+                return GusStatus.Error;
+            }
 			return GusStatus.OK;
         }
 
@@ -217,23 +247,61 @@ namespace Gus
 				LastError = "Division by zero (modulus)";
 				return GusStatus.Error;
 			}
-			_stack.Push(ops[1] % ops[0]);
+			try
+			{
+				_stack.Push(checked(ops[1] % ops[0]));
+			}
+			catch (OverflowException)
+            {
+                LastError = "Operation caused overflow";
+                return GusStatus.Error;
+            }
 			return GusStatus.OK;
 		}
 
-        /// <summary>
-        /// Replaces the top two elements a b with a ^ b
-        /// </summary>
-        /// <returns>The e.</returns>
+		/// <summary>
+		/// Replaces the top two elements a b with a ^ b
+		/// </summary>
+		/// <returns>The e.</returns>
 		GusStatus Process_e()
 		{
 			if (_stack.Count < 2)
-            {
-                return GusStatus.Underflow;
-            }
+			{
+				return GusStatus.Underflow;
+			}
 			var ops = PopN(2); // 0 was top 1 was penult 0 = a 1 = b
+            
+			// 0 ^ (n <=0) = NaN
+			if (ops[1] == 0 && ops[0] <= 0)
+			{
+				LastError = string.Format("Invalid Exp {0} ^ {1}", ops[1], ops[0]);
+				return GusStatus.Error;
+			}
 
-			_stack.Push((int)Math.Pow(ops[1], ops[0]));
+			// >1 ^ -ve = non integer
+            // <1 ^ -ve = non integer
+			if ((ops[1] > 1 || ops[1] < -1 ) && Math.Abs(ops[0]) == -1)
+			{
+                LastError = string.Format("Invalid Exp {0} ^ {1}", ops[1], ops[0]);
+                return GusStatus.Error;
+            }
+            
+            // This should trap most - id not all overflows
+            if(ops[0] * Math.Log(Math.Abs(ops[1])) + 1e-10 > Math.Log(int.MaxValue))
+			{
+				LastError = "Operation caused overflow";
+                return GusStatus.Error;
+			}
+			try
+			{
+				double pow = checked(Math.Pow(ops[1], ops[0]));
+				_stack.Push(checked((int)pow));
+			}
+			catch (OverflowException)
+            {
+                LastError = "Operation caused overflow";
+                return GusStatus.Error;
+            }
 
 			return GusStatus.OK;
 
@@ -305,14 +373,11 @@ namespace Gus
 
 			if (MAX_NUMBER_OF_PRIMES >= ops[0] && ops[0] > 0)
 			{
-				_stack.Push(_primeCache[(int)ops[0] - 1]);
+				_stack.Push(_primeCache[ops[0] - 1]);
 				return GusStatus.OK;
 			}
-			else
-			{
-				LastError = string.Format("Attempted n th prime > {0}", MAX_NUMBER_OF_PRIMES);
-				return GusStatus.Error;
-			}
+			LastError = string.Format("Attempted n th prime > {0}", MAX_NUMBER_OF_PRIMES);
+			return GusStatus.Error;
 		}
 
         /// <summary>
@@ -331,11 +396,8 @@ namespace Gus
 				_stack.Push(Factorial(ops[0]));
 				return GusStatus.OK;
 			}
-			else
-			{
-				LastError = string.Format("Attempted factorial > {0}",MAX_FACT);
-				return GusStatus.Error;
-			}
+			LastError = string.Format("Attempted factorial > {0}", MAX_FACT);
+			return GusStatus.Error;
 		}
 
         /// <summary>
@@ -365,19 +427,16 @@ namespace Gus
         /// <param name="op">Op.</param>
         MethodInfo GetMethodInfo(char op)
         {
-            if (_methodInfoCache.ContainsKey(op))
-            {
-                return _methodInfoCache[op];
-            }
-            else
-            {
-                var methodName = string.Format("Process_{0}", op);
-                MethodInfo methodInfo = this.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-                Debug.Assert(methodInfo != null, string.Format("Method {0} not found.", methodName));
-                _methodInfoCache[op] = methodInfo;
-                return methodInfo;
-            }
-        }
+			if (_methodInfoCache.ContainsKey(op))
+			{
+				return _methodInfoCache[op];
+			}
+			var methodName = string.Format("Process_{0}", op);
+			var methodInfo = this.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+			Debug.Assert(methodInfo != null, string.Format("Method {0} not found.", methodName));
+			_methodInfoCache[op] = methodInfo;
+			return methodInfo;
+		}
         
         /// <summary>
         /// Returns the factorial of n

@@ -15,16 +15,16 @@ namespace Gus
     /// </summary>
 	class Program
 	{      
-		static void Main(string[] args)
+		static void Main()
 		{
 			var gus = new Gus();
 			gus.OnGuess += Gus_OnGuess;
 			while (true)
 			{
 				// Try and guess what's next in this list
-				List<int> sequence = GetSequence();
+				var sequence = GetSequence();
 
-				char response = Choose("Do you want me to Guess or Test a gusL string?", new List<char> {'G', 'T'});
+				var response = Choose("Do you want me to Guess or Test a gusL string?", new List<char> {'G', 'T'});
 
 				if (response == 'G')
 				{
@@ -61,10 +61,10 @@ namespace Gus
             Console.Write(string.Format("{0} ({1}).", prompt, string.Join('/', choices)));
             while (true)
             {
-                string response = Console.ReadLine().ToUpperInvariant();
-                if (choices.Exists(c => response.StartsWith(c)))
+                var response = Console.ReadLine().ToUpperInvariant();
+                if (choices.Exists(response.StartsWith))
                 {
-                    result = choices.Find(c => response.StartsWith(c));
+                    result = choices.Find(response.StartsWith);
                     break;
                 }
                 Console.WriteLine(string.Format("Please enter one of ({0}).", string.Join('/', choices)));
@@ -79,7 +79,7 @@ namespace Gus
             {
 				sequence = null;
                 Console.WriteLine("Enter a sequence of integers (separated by whitespace");
-                string input = Console.ReadLine();
+                var input = Console.ReadLine();
                 var seq = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 try
                 {
@@ -92,7 +92,7 @@ namespace Gus
 				if (sequence != null)
 				{
 					Console.WriteLine(string.Join(", ", sequence));
-					char c = Choose("OK?", new List<char> { 'Y', 'N' });
+					var c = Choose("OK?", new List<char> { 'Y', 'N' });
 					if (c == 'Y')
                     {
                         break;
@@ -105,9 +105,9 @@ namespace Gus
 	    static void TestGusL(Gus gus, List<int> sequence, bool verbose)
         {
             Console.WriteLine("GusL:");
-            string gusl = Console.ReadLine();
+            var gusl = Console.ReadLine();
             int prediction;
-            bool isGood = gus.TestHypothesis(sequence, gusl, verbose, out prediction);
+            var isGood = gus.TestHypothesis(sequence, gusl, verbose, out prediction);
         }    
 	}
 }
