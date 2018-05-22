@@ -15,7 +15,7 @@ namespace Gus
 	/// m - Minus           - a b becomes (a - b)
 	/// t - Times           - a b becomes (a * b)
 	/// d - Divide          - a b becomes (a / b)
-	/// r - Remain          - a n becomes (a % b)
+	/// r - Remain          - a b becomes (a % b)
 	/// e - Exp             - a b becomes (a ^ b)
 	/// w - Swap            - a b becomes b a
 	/// c - Copy            - a becomes a a
@@ -318,8 +318,8 @@ namespace Gus
                 return GusStatus.Underflow;
             }
 			var ops = PopN(2);
-			_stack.Push(ops[1]);
 			_stack.Push(ops[0]);
+			_stack.Push(ops[1]);
 			return GusStatus.OK;
 		}
         

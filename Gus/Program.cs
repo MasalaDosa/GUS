@@ -42,7 +42,7 @@ namespace Gus
 		{
 			Console.WriteLine("Elapsed: {0}.", e.Elapsed);
             Console.WriteLine("I predict {0} ({1}).", e.Prediction, e.Hypothesis);
-            // TODO - Convert GusL hypothesis to English
+			Console.WriteLine(new GusLDescriber(e.Hypothesis).GetDescription());
             var y = Choose("Am I correct?", new List<char> { 'Y', 'N' });
 
 			if (y == 'Y')
@@ -78,7 +78,7 @@ namespace Gus
             while (true)
             {
 				sequence = null;
-                Console.WriteLine("Enter a sequence of integers (separated by whitespace");
+				Console.WriteLine("Enter a sequence of integers (separated by whitespace).");
                 var input = Console.ReadLine();
                 var seq = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 try
@@ -106,8 +106,10 @@ namespace Gus
         {
             Console.WriteLine("GusL:");
             var gusl = Console.ReadLine();
+			Console.WriteLine(new GusLDescriber(gusl).GetDescription());
             int prediction;
             var isGood = gus.TestHypothesis(sequence, gusl, verbose, out prediction);
+
         }    
 	}
 }
