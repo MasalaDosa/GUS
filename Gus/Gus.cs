@@ -17,7 +17,7 @@ namespace Gus
 		{
 			_processor = new GusLProcessor();
 			_memory = new List<string>();
-			_memory.AddRange(_processor.GusLAtoms.Select(c=> c.ToString()));
+			_memory.AddRange(GusLProcessor.GusLAtoms.Select(c=> c.ToString()));
 		}
 
 		public void GuessSequence(List<int> sequence)
@@ -181,16 +181,10 @@ namespace Gus
                 foreach (var hypothesis in Combine(n))
                 {
                     var h = string.Concat(hypothesis);
-                    // Ignore combinations that contain a bad pair.
-					// Or end in a number (its little more than a guess)
-                    // Or contains unimportant leading chars
-                    if( ContainsBadPairs(h) ||
-					    (h.Length > 1 && '1' <= h.Last() && '@' >= h.Last()) ||
-					    ContainsUnimportandLeadingOps(h))
+					if (GusLProcessor.IsGoodGusl(h))
 					{
-						continue;
+						yield return h;
 					}
-					yield return h;
                 }
                 n++;
             }
@@ -227,105 +221,6 @@ namespace Gus
                         }
                     }
                 }
-            }
-        }
-
-		/// <summary>
-        /// Some combinations we ignore.
-        /// The are either:
-        /// Pointless (e.g. "po"),
-        /// Redundant (e.g. "cp" - better expressed as "2t"),
-        /// Nasty (e.g "FF")
-        /// </summary>
-	    static bool ContainsBadPairs(string hypothesis)
-        {
-            List<string> badCombos = new List<string>
-			{
-                "po", "to" ,"eo", "ro","do","mo","cp","ct","cr","cd",
-                "cm","cp","cw","wp","wt","ww","no","nn","Po","PP",
-                "PF","Fe","Fr","Fo","FP","FF","It","le","lr","Id",
-                "lc","lo","1P","1F","11","12","13","14","15","2c",
-                "2o","2P","2F","3c","3o","3P","3F","4c","4o","5c",
-                "5o",":c",":o",":e", "eP"
-			};
-
-			if (hypothesis.Length < 2)
-            {
-                return false;
-            }
-
-            foreach (string pair in badCombos)
-            {
-				if (hypothesis.Contains(pair))
-				{
-					return true;
-				}
-            }
-            return false;
-        }
-
-        static bool ContainsUnimportandLeadingOps(string gusl)
-		{
-			return gusl != GuslSimplify(gusl);
-		}
-
-
-		/// <summary>
-        /// Removes pointless leading characters from a guls string
-        /// e.g. "ppp28:tnm" is basically the same as "8:2tnm"
-        /// The leading chars do not have any effect on the final result.
-        /// All they serve is to eat up the stack and make an underflow likely
-        /// Consider the tree:
-        /// m -> n
-        ///   -> t -> :
-        ///        -> 8
-        /// </summary>
-        static string GuslSimplify(string gusl)
-        {
-            int index = gusl.Length - 1;
-            int count = 0;
-            string usefulRhs = string.Empty;
-            for (int i = gusl.Length - 1; i >= 0; i--)
-            {
-                char c = gusl[i];
-                usefulRhs = string.Concat(c, usefulRhs);
-
-                // These operations have no real effect on this check
-                if (new List<char> { 'w', 'o' }.Contains(c))
-                {
-                    continue;
-                }
-
-                count += RequiredChildNodes(c);
-
-                if (count == 0)
-                {
-                    break;
-                }
-                count--;
-            }
-            return usefulRhs;
-        }
-
-
-        static int RequiredChildNodes(char c)
-        {
-            // 'o' ? 'w' ?
-
-            switch (c)
-            {
-                // These all count as 'end nodes' in our syntax tree
-                case char n when n >= '1' && n <= '@' ||
-                    new List<char> { 'n', 'c' }.Contains(n):
-                    return 0;
-                // All these require 2 child nodes / argument
-                case char n when new List<char> { 'p', 'm', 't', 'd', 'r', 'e' }.Contains(n):
-                    return 2;
-                // These require 1 childnode / argument
-                case char n when new List<char> { 'P', 'F' }.Contains(n):
-                    return 1;
-                default:
-                    return 0;
             }
         }
 	}
